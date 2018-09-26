@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# TODO: Use file attributes to add extra protection to files
+
 if [ 1 -gt $# -o 3 -lt $# ]; then
     echo "$0 list"
     echo "$0 get key"
