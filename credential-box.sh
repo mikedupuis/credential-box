@@ -2,62 +2,38 @@
 
 # TODO: Use file attributes to add extra protection to files
 
-if [ 1 -gt $# -o 3 -lt $# ]; then
-    echo "$0 list"
-    echo "$0 get key"
-    echo "$0 set key value"
-    exit 1
-fi
+init () {
+    CIPHER=-aes-256-cbc
 
-if [ 1 = $# -a "list" != "$1" ]; then
-    echo "$0 list"
-    echo "$0 get key"
-    echo "$0 set key value"
-    exit 1
-fi
-    
-if [ 2 = $# -a "get" != "$1" ]; then
-    echo "$0 list"
-    echo "$0 get key"
-    echo "$0 set key value"
-    exit 1
-fi
-
-if [ 3 = $# -a "set" != "$1" ]; then
-    echo "$0 list"
-    echo "$0 get key"
-    echo "$0 set key value"
-    exit 1
-fi
-
-CREDENTIAL_DIR=/tmp/credentials
-if [ ! -d ${CREDENTIAL_DIR} ]; then
-    mkdir -p ${CREDENTIAL_DIR}
+    CREDENTIAL_DIR=/tmp/credentials
     if [ ! -d ${CREDENTIAL_DIR} ]; then
-        echo ERROR: Cannot create credential directory ${CREDENTIAL_DIR}, exiting!
-        exit 1
+        mkdir -p ${CREDENTIAL_DIR}
+        if [ ! -d ${CREDENTIAL_DIR} ]; then
+            echo ERROR: Cannot create credential directory ${CREDENTIAL_DIR}, exiting!
+            exit 1
+        fi
     fi
-fi
+}
 
-CREDENTIAL_FILE=${CREDENTIAL_DIR}/$2.enc
-CIPHER=-aes-256-cbc
-
-if [ "$1" = "list" ]; then
+list_credentials() {
     ls ${CREDENTIAL_DIR} | sed s/\.enc//g | sort
-fi
+}
 
-if [ "$1" = "set" ]; then
+set_credential() {
+    CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
     if [ -f ${CREDENTIAL_FILE} ]; then
         while :
         do
-            echo "Credential $2 is already stored, do you want to overwrite it? [Y/n]: "
+            echo "Credential $1 is already stored, do you want to overwrite it? [Y/n]: "
             read OVERWRITE
             OVERWRITE=$(echo ${OVERWRITE} | tr [a-z] [A-Z])
+            echo got overwrite ${OVERWRITE}
             
             if [ 'Y' = "${OVERWRITE}" -o 'N' = "${OVERWRITE}" ]; then
-                echo "I don't understand, please try again"
                 break;
             fi
+
+            echo "I don't understand, please try again"
         done
 
         if [ 'N' = "${OVERWRITE}" ]; then
@@ -65,23 +41,106 @@ if [ "$1" = "set" ]; then
             exit 0
         fi
     fi
-    
-    echo $3 | openssl enc ${CIPHER} -salt -a > /tmp/credentials/$2.enc
 
-    if [ -f /tmp/credentials/$2.enc ]; then
-        chmod 600 $2.enc
+    echo "Please enter your data: "
+    read DATA
+
+    echo ${DATA} | openssl enc ${CIPHER} -salt -a > ${CREDENTIAL_FILE}
+
+    if [ -f ${CREDENTIAL_FILE} ]; then
+        chmod 600 ${CREDENTIAL_FILE}
     else
-        echo Failed to save credential $2! >2
+        echo >&2 Failed to save credential \"$1\"!
         exit 2
     fi
-fi
+}
 
-if [ "$1" = "get" ]; then
-    if [ ! -f /tmp/credentials/$2.enc ]; then
-        echo Unknown credential $2! >2
+get_credential() {
+    CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
+    if [ ! -f ${CREDENTIAL_FILE} ]; then
+        echo >&2 Unknown credential \"$1\"!
         exit 3
     fi
 
-    openssl enc ${CIPHER} -a -d -in /tmp/credentials/$2.enc
-fi
+    openssl enc ${CIPHER} -a -d -in ${CREDENTIAL_FILE}
+}
 
+remove_credential() {
+    CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
+    if [ ! -f ${CREDENTIAL_FILE} ]; then
+        echo >&2 Unknown credential \"$1\"!
+        exit 3
+    fi
+
+    rm ${CREDENTIAL_FILE}
+}
+
+usage () {
+    echo "$(basename $0) mode [args]"
+    echo ""
+    echo "MODE              ARGS"
+    echo "------------------------"
+    echo "list|ls           [none]"
+    echo "get               key"
+    echo "set               key"
+    echo "remove|rm         key"
+    echo ""
+    echo "list mode"
+    echo "Required arguments: [none]"
+    echo "Lists all stored keys"
+    echo ""
+    echo "get mode"
+    echo "Required arguments: key"
+    echo "Returns data stored for the given key"
+    echo ""
+    echo "set mode"
+    echo "Required arguments: key"
+    echo "Prompts the user for data, then stores the data under the given key"
+    echo ""
+    echo "remove mode"
+    echo "Required arguments: key"
+    echo "Remove the given key"
+}
+
+init
+
+case "$#" in
+    1)
+        case $1 in
+            list)
+                list_credentials
+                ;;
+            ls)
+                list_credentials
+                ;;
+            *)
+                usage
+                exit 1
+        esac
+        exit 0
+        ;;
+    2)
+        case $1 in
+            get)
+                get_credential $2
+                ;;
+            set)
+                set_credential $2
+                ;;
+            remove)
+                remove_credential $2
+                ;;
+            rm)
+                remove_credential $2
+                ;;
+            *)
+                usage
+                exit 1
+        esac
+        exit 0
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
