@@ -5,7 +5,7 @@
 init () {
     CIPHER=-aes-256-cbc
 
-    CREDENTIAL_DIR=/tmp/credentials
+    CREDENTIAL_DIR=~/credentials
     if [ ! -d ${CREDENTIAL_DIR} ]; then
         mkdir -p ${CREDENTIAL_DIR}
         if [ ! -d ${CREDENTIAL_DIR} ]; then
@@ -85,19 +85,19 @@ usage () {
     echo "set               key"
     echo "remove|rm         key"
     echo ""
-    echo "list mode"
+    echo "list|ls"
     echo "Required arguments: [none]"
     echo "Lists all stored keys"
     echo ""
-    echo "get mode"
+    echo "get"
     echo "Required arguments: key"
     echo "Returns data stored for the given key"
     echo ""
-    echo "set mode"
+    echo "set"
     echo "Required arguments: key"
     echo "Prompts the user for data, then stores the data under the given key"
     echo ""
-    echo "remove mode"
+    echo "remove|rm"
     echo "Required arguments: key"
     echo "Remove the given key"
 }
