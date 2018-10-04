@@ -4,6 +4,7 @@
 
 init () {
     CIPHER=-aes-256-cbc
+    GENERATOR='pwgen -nB1s 20'
 
     CREDENTIAL_DIR=~/credentials
     if [ ! -d ${CREDENTIAL_DIR} ]; then
@@ -16,7 +17,45 @@ init () {
 }
 
 list_credentials() {
-    find ${CREDENTIAL_DIR} -name "*.enc" | sort
+    ls -r ${CREDENTIAL_DIR} | sed s/\.enc//g | sort
+}
+
+# Return 1 if it's okay to write to the given file, 0 otherwise
+check_credential_overwrite() {
+    echo check_credential_overwrite starting for $1
+    CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
+    if [ -f "$CREDENTIAL_FILE" ]; then
+        while :
+        do
+            echo "Credential $1 is already stored, do you want to overwrite it? [Y/n]: "
+            read -r OVERWRITE
+            OVERWRITE=$(echo "$OVERWRITE" | tr [a-z] [A-Z])
+            
+            if [ 'Y' = "${OVERWRITE}" -o 'N' = "${OVERWRITE}" ]; then
+                break;
+            fi
+
+            echo "I don't understand, please try again"
+        done
+
+        if [ 'N' = "${OVERWRITE}" ]; then
+            echo "Okay, I'll leave it alone"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+write_credential() {
+    echo "$1" | openssl enc ${CIPHER} -salt -a > "$2"
+
+    if [ -f "$2" ]; then
+        chmod 600 "$2"
+    else
+        echo >&2 "Failed to save credential: $2!"
+        exit 2
+    fi
 }
 
 set_credential() {
@@ -26,7 +65,7 @@ set_credential() {
         do
             echo "Credential $1 is already stored, do you want to overwrite it? [Y/n]: "
             read -r OVERWRITE
-            OVERWRITE=$(echo "$OVERWRITE" | tr 'a-z A-Z')
+            OVERWRITE=$(echo "$OVERWRITE" | tr [a-z] [A-Z])
             echo got overwrite "$OVERWRITE"
             
             if [ 'Y' = "${OVERWRITE}" -o 'N' = "${OVERWRITE}" ]; then
@@ -50,7 +89,7 @@ set_credential() {
     if [ -f "$CREDENTIAL_FILE" ]; then
         chmod 600 "$CREDENTIAL_FILE"
     else
-        echo >&2 "Failed to save credential $1 !"
+        echo >&2 "Failed to save credential: $1!"
         exit 2
     fi
 }
@@ -58,7 +97,7 @@ set_credential() {
 get_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
     if [ ! -f "$CREDENTIAL_FILE" ]; then
-        echo >&2 "Unknown credential $1 !"
+        echo >&2 "Unknown credential: $1!"
         exit 3
     fi
 
@@ -68,11 +107,26 @@ get_credential() {
 remove_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
     if [ ! -f "$CREDENTIAL_FILE" ]; then
-        echo >&2 "Unknown credential $1 !"
+        echo >&2 "Unknown credential: $1!"
         exit 3
     fi
 
     rm "$CREDENTIAL_FILE"
+}
+
+generate_credential() {
+    CREDENTIAL_FILE=${CREDENTIAL_DIR}/$2.enc
+    check_credential_overwrite $2
+    can_overwrite=$?
+
+    if [ 1 -ne ${can_overwrite} ]; then
+        exit 1
+    fi
+
+    credential=$(${GENERATOR})
+    data=$(echo ${@:3} ${credential})
+
+    write_credential "${data}" ${CREDENTIAL_FILE}
 }
 
 usage () {
@@ -84,6 +138,7 @@ usage () {
     echo "get               key"
     echo "set               key"
     echo "remove|rm         key"
+    echo "generate|gen      key [prefix...]"
     echo ""
     echo "list|ls"
     echo "Required arguments: [none]"
@@ -100,11 +155,18 @@ usage () {
     echo "remove|rm"
     echo "Required arguments: key"
     echo "Remove the given key"
+    echo ""
+    echo "generate|gen"
+    echo "Required arguments: key"
+    echo "Optional arguments: prefix"
+    echo "Generate a strong password for key, with the given prefixes appearing before the password"
+
 }
 
 init
 
 case "$#" in
+    # For modes which require EXACTLY 1 argument
     1)
         case $1 in
             list)
@@ -119,6 +181,8 @@ case "$#" in
         esac
         exit 0
         ;;
+
+    # For modes which require EXACTLY 2 arguments
     2)
         case $1 in
             get)
@@ -133,6 +197,12 @@ case "$#" in
             rm)
                 remove_credential "$2"
                 ;;
+            generate)
+                generate_credential $@
+                ;;
+            gen)
+                generate_credential $@
+                ;;
             *)
                 usage
                 exit 1
@@ -140,7 +210,15 @@ case "$#" in
         exit 0
         ;;
     *)
-        usage
-        exit 1
-        ;;
+        case $1 in
+            generate)
+                generate_credential $@
+                ;;
+            gen)
+                generate_credential $@
+                ;;
+            *)
+                usage
+                exit 1
+        esac
 esac
