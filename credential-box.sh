@@ -16,18 +16,18 @@ init () {
 }
 
 list_credentials() {
-    ls ${CREDENTIAL_DIR} | sed s/\.enc//g | sort
+    find ${CREDENTIAL_DIR} -name "*.enc" | sort
 }
 
 set_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
-    if [ -f ${CREDENTIAL_FILE} ]; then
+    if [ -f "$CREDENTIAL_FILE" ]; then
         while :
         do
             echo "Credential $1 is already stored, do you want to overwrite it? [Y/n]: "
-            read OVERWRITE
-            OVERWRITE=$(echo ${OVERWRITE} | tr [a-z] [A-Z])
-            echo got overwrite ${OVERWRITE}
+            read -r OVERWRITE
+            OVERWRITE=$(echo "$OVERWRITE" | tr 'a-z A-Z')
+            echo got overwrite "$OVERWRITE"
             
             if [ 'Y' = "${OVERWRITE}" -o 'N' = "${OVERWRITE}" ]; then
                 break;
@@ -43,36 +43,36 @@ set_credential() {
     fi
 
     echo "Please enter your data: "
-    read DATA
+    read -r DATA
 
-    echo ${DATA} | openssl enc ${CIPHER} -salt -a > ${CREDENTIAL_FILE}
+    echo "$DATA" | openssl enc ${CIPHER} -salt -a > "$CREDENTIAL_FILE"
 
-    if [ -f ${CREDENTIAL_FILE} ]; then
-        chmod 600 ${CREDENTIAL_FILE}
+    if [ -f "$CREDENTIAL_FILE" ]; then
+        chmod 600 "$CREDENTIAL_FILE"
     else
-        echo >&2 Failed to save credential \"$1\"!
+        echo >&2 "Failed to save credential $1 !"
         exit 2
     fi
 }
 
 get_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
-    if [ ! -f ${CREDENTIAL_FILE} ]; then
-        echo >&2 Unknown credential \"$1\"!
+    if [ ! -f "$CREDENTIAL_FILE" ]; then
+        echo >&2 "Unknown credential $1 !"
         exit 3
     fi
 
-    openssl enc ${CIPHER} -a -d -in ${CREDENTIAL_FILE}
+    openssl enc ${CIPHER} -a -d -in "$CREDENTIAL_FILE"
 }
 
 remove_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
-    if [ ! -f ${CREDENTIAL_FILE} ]; then
-        echo >&2 Unknown credential \"$1\"!
+    if [ ! -f "$CREDENTIAL_FILE" ]; then
+        echo >&2 "Unknown credential $1 !"
         exit 3
     fi
 
-    rm ${CREDENTIAL_FILE}
+    rm "$CREDENTIAL_FILE"
 }
 
 usage () {
@@ -122,16 +122,16 @@ case "$#" in
     2)
         case $1 in
             get)
-                get_credential $2
+                get_credential "$2"
                 ;;
             set)
-                set_credential $2
+                set_credential "$2"
                 ;;
             remove)
-                remove_credential $2
+                remove_credential "$2"
                 ;;
             rm)
-                remove_credential $2
+                remove_credential "$2"
                 ;;
             *)
                 usage
