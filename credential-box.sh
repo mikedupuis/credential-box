@@ -94,7 +94,7 @@ set_credential() {
     fi
 }
 
-get_credential() {
+read_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
     if [ ! -f "$CREDENTIAL_FILE" ]; then
         echo >&2 "Unknown credential: $1!"
@@ -104,6 +104,15 @@ get_credential() {
     openssl enc ${CIPHER} -a -d -in "$CREDENTIAL_FILE"
 }
 
+get_credential() {
+    CREDENTIAL=$(read_credential $1)
+    if [ -z ${CREDENTIAL} ]; then
+        exit 1
+    fi
+
+    echo ${CREDENTIAL}
+}
+
 remove_credential() {
     CREDENTIAL_FILE=${CREDENTIAL_DIR}/$1.enc
     if [ ! -f "$CREDENTIAL_FILE" ]; then
@@ -111,7 +120,11 @@ remove_credential() {
         exit 3
     fi
 
+    read_credential $1 > /dev/null
+
     rm "$CREDENTIAL_FILE"
+
+    echo removed credential $1
 }
 
 generate_credential() {
